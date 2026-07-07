@@ -1,0 +1,169 @@
+
+# services:
+
+#   # -----------------------------------------------------------
+#   # vLLM SERVER -- model load karta h, HTTP endpoint expose karta
+#   # -----------------------------------------------------------
+#   vllm-server:
+#     image: ${VLLM_IMAGE}
+#     container_name: vllm_gemma_server
+#     runtime: nvidia
+#     ipc: host
+#     ports:
+#       - "${PORT}:${PORT}"
+#     volumes:
+#       - "${MODEL_HOST_PATH}:${MODEL_CONTAINER_PATH}"
+#     environment:
+#       - NVIDIA_VISIBLE_DEVICES=all
+      
+#     # NOTE: entrypoint OVERRIDE nahi kar rahe -- vLLM ki image
+#     # ka apna default entrypoint use hoga (jo "python" ko sahi
+#     # path se already jaanta h). Humne pehle "bash -c" se
+#     # override kar diya tha jisse "python: command not found"
+#     # aaya (image me python seedha PATH me nahi h, apne virtual
+#     # env me h -- image ka default entrypoint isko already
+#     # handle karta h).
+#     #
+#     # "command:" yahan sirf ARGUMENTS h jo image ke default
+#     # entrypoint ko milenge.
+#     command:
+#       - "--model"
+#       - "${MODEL_CONTAINER_PATH}"
+#       - "--served-model-name"
+#       - "${SERVED_MODEL_NAME}"
+#       - "--quantization"
+#       - "${QUANTIZATION}"
+#       - "--kv-cache-dtype"
+#       - "${KV_CACHE_DTYPE}"
+#       - "--max-num-batched-tokens"
+#       - "${MAX_NUM_BATCHED_TOKENS}"
+#       - "--max-model-len"
+#       - "${MAX_MODEL_LEN}"
+#       - "--tensor-parallel-size"
+#       - "${TENSOR_PARALLEL_SIZE}"
+#       - "--gpu-memory-utilization"
+#       - "${GPU_MEMORY_UTILIZATION}"
+#       - "--host"
+#       - "${HOST}"
+#       - "--port"
+#       - "${PORT}"
+#     deploy:
+#       resources:
+#         reservations:
+#           devices:
+#             - driver: nvidia
+#               count: all
+#               capabilities: [gpu]
+
+#   # -----------------------------------------------------------
+#   # CLIENT -- vLLM server ko HTTP se call karta h
+#   # -----------------------------------------------------------
+#   client:
+#     build:
+#       context: ../client_
+#       dockerfile: Dockerfile
+#     container_name: rag_client
+#     depends_on:
+#       - vllm-server
+#     env_file:
+#       - ../client_/.env
+
+# # ============================================================
+# # ZAROORI: is docker-compose.yml ke IS FOLDER (config/) me
+# # EK ".env" file honi CHAHIYE jisme vLLM wali saari values ho
+# # (VLLM_IMAGE, PORT, MODEL_HOST_PATH, etc.) -- kyunki
+# # ${VLLM_IMAGE} jaisi cheezein docker-compose.yml khud "parse"
+# # karte waqt chahiye, aur wo SIRF isi folder ki top-level .env
+# # se milti h (client wali "env_file:" line sirf CLIENT
+# # CONTAINER ke andar env vars deti h, docker-compose.yml ko
+# # khud nahi).
+# #
+# # CHALANE KA TARIKA (isi config/ folder ke andar se):
+# #   docker compose up -d --build
+# #
+# # "depends_on" sirf itna guarantee karta h ki vllm-server
+# # CONTAINER pehle start ho -- lekin model load hone me time
+# # lagta h, isliye client ko thoda retry-logic apne andar rakhna
+# # chahiye agar turant call kare (production me health-check
+# # add kar sakte h baad me).
+# # ============================================================
+
+
+
+
+
+
+
+
+
+
+
+services:
+
+  # -----------------------------------------------------------
+  # vLLM SERVER -- model load karta h, HTTP endpoint expose karta
+  # -----------------------------------------------------------
+  vllm-server:
+    image: ${VLLM_IMAGE}
+    container_name: vllm_gemma_server
+    runtime: nvidia
+    ipc: host
+    ports:
+      - "${PORT}:${PORT}"
+    volumes:
+      - "${MODEL_HOST_PATH}:${MODEL_CONTAINER_PATH}"
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - VLLM_LOGGING_LEVEL=DEBUG
+      # --- FORCE REUSE AND SKIP STRICT UNINITIALIZED VAL ---
+      - VLLM_STRICT_WEIGHTS=0
+      - VLLM_DISABLE_WEIGHT_VALIDATION=1
+    command:
+      - "--model"
+      - "${MODEL_CONTAINER_PATH}"
+      - "--served-model-name"
+      - "${SERVED_MODEL_NAME}"
+      - "--kv-cache-dtype"
+      - "${KV_CACHE_DTYPE}"
+      - "--max-num-batched-tokens"
+      - "${MAX_NUM_BATCHED_TOKENS}"
+      - "--max-model-len"
+      - "${MAX_MODEL_LEN}"
+      - "--tensor-parallel-size"
+      - "${TENSOR_PARALLEL_SIZE}"
+      - "--gpu-memory-utilization"
+      - "${GPU_MEMORY_UTILIZATION}"
+      - "--host"
+      - "${HOST}"
+      - "--port"
+      - "${PORT}"
+      - "--load-format"
+      - "safetensors"
+      # --- REMOVED THE UNRECOGNIZED STR_WEIGHTS FLAG FROM HERE ---
+
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  # -----------------------------------------------------------
+  # CLIENT -- vLLM server ko HTTP se call karta h
+  # -----------------------------------------------------------
+
+
+  client:
+    ports:
+      - "5000:5000"
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: llm_serve
+    depends_on:
+      - vllm-server
+    env_file:
+      - ../backend/vllm/.env
+
+
