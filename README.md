@@ -1,33 +1,49 @@
-# Local RAG System — vLLM Backend + Observability
+# Local LLM Stack
 
-A local, Docker-based LLM serving stack built around vLLM, with a FastAPI backend proxy and Langfuse observability. This README documents the architecture and design decisions made so far.
+```
+chat_client.py  →  backend (:5000)  →  vLLM (:8000)  →  GPU model
+                         ↓
+                   Langfuse (:3000)   [traces, optional]
+```
 
----
+**Flow:** terminal client → FastAPI `/chat/structured` → ek vLLM call → `{answer, extracted_facts}` → client memory me facts merge.
 
 ## 1. Project Structure
 
 ```
 rag/
 ├── config/
-│   ├── .env                    # vLLM server config (model path, GPU settings, etc.)
-│   └── docker-compose.yml      # Orchestrates vllm-server, backend, and Langfuse stack
+│   ├── .env.example                    # vLLM + Langfuse stack config (model path, GPU, secrets)
+│   ├── docker-compose.yml      # vllm-server, backend, Langfuse stack
+│   └── Dockerfile              # optional / alternate vLLM image build
 │
 ├── backend/
 │   ├── Dockerfile
-│   ├── main.py                 # FastAPI app init + router registration only
-│   ├── Dockerfile
+│   ├── main.py                 # FastAPI app + router registration only
 │   ├── requirements.txt
 │   └── vllm/
-│       ├── .env                 # BASE_URL, MODEL_NAME, Langfuse keys (container-scoped)
-│       ├── client.py            # LLM call logic (business logic layer)
-│       ├── routes.py            # HTTP endpoints (/health, /chat, /chat/stream)
-│       └── schemas.py           # Pydantic request/response models
+│       ├── .env.example                # BASE_URL, MODEL_NAME, Langfuse keys (backend container)
+│       ├── client.py           # LLM call logic (business logic)
+│       ├── routes.py           # HTTP: /health, /chat, /chat/structured, /chat/stream
+│       └── schemas.py          # Pydantic request/response models
 │
-├── chat_client.py               # Standalone terminal client for testing the backend
-└── client_/                     # Separate standalone script (direct vLLM/Azure client)
-    ├── client.py
-
+├── chat_client.py              # terminal client → /chat/structured + local memory
+└── README.md
 ```
+
+## 2. Run (4 steps)
+
+1. Env copy: `config/.env.example` → `config/.env` · `backend/vllm/.env.example` → `backend/vllm/.env` · model path + secrets set karo  
+2. Stack start: `cd config` → `docker compose up -d --build`  
+3. Model load hone do (GPU + vLLM ready)  
+4. Chat: root se `python chat_client.py`  
+   - `facts` = memory · `clear` = wipe · `exit` = quit  
+
+**URLs:** backend `http://localhost:5000` · vLLM `http://localhost:8000` · Langfuse UI `http://localhost:3000`
+
+
+
+
 
 ### Design principle: feature-based (vertical slice) architecture
 
