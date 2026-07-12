@@ -155,7 +155,7 @@ main.py
 
 ```
                     ┌─────────────────────────────┐
-  user + memory ──► │  vLLM guided JSON (xgrammar) │
+  user + memory ──► │  vLLM guided JSON (xgrammar)│
                     │                             │
                     │  {                          │
                     │    "answer": "...",         │  ← user-facing reply
